@@ -5,7 +5,6 @@ import (
 	"strings"
 	"time"
 
-
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -37,25 +36,14 @@ func NewModel(e *Engine) Model {
 func (m Model) Init() tea.Cmd {
 	return tea.Batch(
 		textinput.Blink,
-		m.tickCmd(),
+		m.listenForTick(),
 	)
 }
 
-func (m Model) tickCmd() tea.Cmd {
-	// The ticker always runs to keep the UI responsive, 
-	// but the Engine decides if it should advance logic.
-	// We use a constant UI refresh rate (e.g., 100ms) or 
-	// scale it by speed for visual feedback.
-	
-	speed := m.Engine.Velocity
-	if speed == 0 {
-		speed = 1 // Min speed to keep the UI ticking/checking for unpause
+func (m Model) listenForTick() tea.Cmd {
+	return func() tea.Msg {
+		return tickMsg(<-m.Engine.Clock.GetTickChan())
 	}
-	
-	duration := time.Second / time.Duration(speed)
-	return tea.Tick(duration, func(t time.Time) tea.Msg {
-		return tickMsg(t)
-	})
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -80,18 +68,25 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch msg.String() {
 			case "p", " ":
 				m.Engine.TogglePause()
-				return m, m.tickCmd()
-			case "1": m.Engine.SetVelocity(1); return m, m.tickCmd()
-			case "2": m.Engine.SetVelocity(2); return m, m.tickCmd()
-			case "4": m.Engine.SetVelocity(4); return m, m.tickCmd()
-			case "8": m.Engine.SetVelocity(8); return m, m.tickCmd()
+				return m, nil
+			case "1":
+				m.Engine.SetVelocity(1)
+				return m, nil
+			case "2":
+				m.Engine.SetVelocity(2)
+				return m, nil
+			case "4":
+				m.Engine.SetVelocity(4)
+				return m, nil
+			case "8":
+				m.Engine.SetVelocity(8)
+				return m, nil
 			}
 		}
 
 	case tickMsg:
-		// Logic advancement is now encapsulated in the Engine
-		m.Engine.UpdateTick()
-		return m, m.tickCmd()
+		m.Engine.UpdateTick(time.Time(msg))
+		return m, m.listenForTick()
 	}
 
 	m.TextInput, cmd = m.TextInput.Update(msg)
@@ -145,24 +140,48 @@ func (m Model) View() string {
 	c := m.Engine.Country
 
 	// Header
-	worldInfo := fmt.Sprintf("Era: %s | Data: %s | Estação: %s", 
-		w.Era.Name, 
-		w.Date.Format("02/01/2006"), 
-		w.GetSeason(),
-	)
-	header := headerStyle.Render("CODEX MUNDI | " + worldInfo)
-	
-	stats := fmt.Sprintf("\n Líder: %s | PIB: %s | Pop: %s | Velocidade: %dx %s\n",
-		c.Politics.Leader,
-		statStyle.Render(fmt.Sprintf("%.2f", c.Economy.GDP)),
-		statStyle.Render(fmt.Sprintf("%d", c.Population.Total)),
-		m.Engine.Velocity,
-		func() string { if m.Engine.IsPaused() { return "(PAUSADO)" }; return "" }(),
-	)
+	headerText := "CODEX MUNDI"
+	if w != nil {
+		worldInfo := fmt.Sprintf("Era: %s | Data: %s | Estação: %s",
+			w.Era.Name,
+			w.Date.Format("02/01/2006"),
+			w.GetSeason(),
+		)
+		headerText += " | " + worldInfo
+	}
+	header := headerStyle.Render(headerText)
+
+	var stats string
+	if c != nil {
+		stats = fmt.Sprintf("\n Líder: %s | PIB: %s | Pop: %s | Velocidade: %dx %s\n",
+			c.Politics.Leader,
+			statStyle.Render(fmt.Sprintf("%.2f", c.Economy.GDP)),
+			statStyle.Render(fmt.Sprintf("%d", c.Population.Total)),
+			m.Engine.GetVelocity(),
+			func() string {
+				if m.Engine.IsPaused() {
+					return "(PAUSADO)"
+				}
+				return ""
+			}(),
+		)
+	} else {
+		stats = fmt.Sprintf("\n Velocidade: %dx %s\n",
+			m.Engine.GetVelocity(),
+			func() string {
+				if m.Engine.IsPaused() {
+					return "(PAUSADO)"
+				}
+				return ""
+			}(),
+		)
+	}
 
 	// Logs
 	start := len(m.Logs) - 10
-	if start < 0 { start = 0 }
+	if start < 0 {
+		start = 0
+	}
 	logs := strings.Join(m.Logs[start:], "\n")
 	body := logStyle.Render(logs)
 

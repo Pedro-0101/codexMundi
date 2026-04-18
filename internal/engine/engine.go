@@ -2,25 +2,25 @@ package engine
 
 import (
 	"codexMundi/internal/domain"
+	"time"
 )
 
 type Engine struct {
-	Velocity     int
-	LastVelocity int
-	Tick         int
-	World        *domain.World
-	Country      *domain.Country
+	Clock   *Clock
+	World   *domain.World
+	Country *domain.Country
 }
 
 var instance *Engine
 
 func GetInstance() *Engine {
 	if instance == nil {
+		startTime := time.Date(1000, 1, 1, 0, 0, 0, 0, time.UTC)
 		instance = &Engine{
-			Velocity:     1,
-			LastVelocity: 1,
-			Tick:         0,
+			Clock: NewClock(startTime),
 		}
+		// Start the clock in a background goroutine
+		go instance.Clock.Start()
 	}
 	return instance
 }
@@ -31,40 +31,25 @@ func (e *Engine) SetState(w *domain.World, c *domain.Country) {
 }
 
 func (e *Engine) TogglePause() {
-	if e.Velocity == 0 {
-		e.Velocity = e.LastVelocity
-	} else {
-		e.LastVelocity = e.Velocity
-		e.Velocity = 0
-	}
+	e.Clock.TogglePause()
 }
 
 func (e *Engine) SetVelocity(v int) {
-	e.Velocity = v
-	if v > 0 {
-		e.LastVelocity = v
-	}
+	e.Clock.SetVelocity(int8(v))
 }
 
 func (e *Engine) IsPaused() bool {
-	return e.Velocity == 0
+	return e.Clock.IsPaused()
 }
 
-func (e *Engine) UpdateTick() {
-	if e.Velocity == 0 {
-		return
+func (e *Engine) GetVelocity() int {
+	return int(e.Clock.GetVelocity())
+}
+
+// UpdateTick process a single tick from the clock.
+func (e *Engine) UpdateTick(t time.Time) {
+	if e.World != nil {
+		e.World.Date = t
+		// Here we would trigger more domain logic
 	}
-
-	e.Tick++
-	
-	// Advance Date (1 tick = 1 day in MVP)
-	e.World.AdvanceDate(1)
-
-	// Deterministic Growth
-	// GDP grows by 0.1% per tick when things are normal
-	e.Country.Economy.GDP *= 1.001
-	
-	// Population increases based on a base rate scaled by world speed (relative to UI)
-	// For now, simple linear growth
-	e.Country.Population.Total += int64(e.Velocity)
 }
