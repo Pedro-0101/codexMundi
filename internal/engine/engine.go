@@ -6,9 +6,8 @@ import (
 )
 
 type Engine struct {
-	Clock   *Clock
-	World   *domain.World
-	Country *domain.Country
+	Clock *Clock
+	World *domain.World
 }
 
 var instance *Engine
@@ -25,9 +24,21 @@ func GetInstance() *Engine {
 	return instance
 }
 
-func (e *Engine) SetState(w *domain.World, c *domain.Country) {
+func (e *Engine) SetState(w *domain.World) {
 	e.World = w
-	e.Country = c
+}
+
+func (e *Engine) InitializeSimulation() {
+	medieval := &domain.Era{Name: "Era Medieval"}
+
+	countries := []*domain.Country{
+		domain.NewCountry("Brasil", &domain.Politics{Leader: "D. Pedro II"}, &domain.Economy{GDP: 5000}, &domain.Population{Total: 1000000}),
+		domain.NewCountry("Japão", &domain.Politics{Leader: "Meiji"}, &domain.Economy{GDP: 7000}, &domain.Population{Total: 2000000}),
+		domain.NewCountry("Alemanha", &domain.Politics{Leader: "Bismarck"}, &domain.Economy{GDP: 8000}, &domain.Population{Total: 1500000}),
+	}
+
+	world := domain.NewWorld(e.Clock.GetCurrentTime(), medieval, countries)
+	e.World = world
 }
 
 func (e *Engine) TogglePause() {
@@ -47,9 +58,13 @@ func (e *Engine) GetVelocity() int {
 }
 
 // UpdateTick process a single tick from the clock.
-func (e *Engine) UpdateTick(t time.Time) {
+func (e *Engine) UpdateTick(t time.Time) []string {
+	var logs []string
 	if e.World != nil {
 		e.World.Date = t
-		// Here we would trigger more domain logic
+		for _, c := range e.World.Countries {
+			logs = append(logs, c.Update())
+		}
 	}
+	return logs
 }

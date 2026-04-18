@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"codexMundi/internal/domain"
 	"fmt"
 	"strings"
 	"time"
@@ -85,7 +86,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case tickMsg:
-		m.Engine.UpdateTick(time.Time(msg))
+		logs := m.Engine.UpdateTick(time.Time(msg))
+		for _, l := range logs {
+			m.addLog(l)
+		}
 		return m, m.listenForTick()
 	}
 
@@ -107,11 +111,19 @@ func (m *Model) handleInput(input string) {
 				m.Engine.SetVelocity(s)
 			}
 		default:
-			m.Logs = append(m.Logs, "Comando desconhecido: "+cmd)
+			m.addLog("Comando desconhecido: " + cmd)
 		}
 		return
 	}
-	m.Logs = append(m.Logs, "Ação Narrativa: "+input)
+	m.addLog("Ação Narrativa: " + input)
+}
+
+func (m *Model) addLog(msg string) {
+	dateStr := "??/??/????"
+	if m.Engine.World != nil {
+		dateStr = m.Engine.World.Date.Format("02/01/2006")
+	}
+	m.Logs = append(m.Logs, fmt.Sprintf("[%s] %s", dateStr, msg))
 }
 
 // Styles
@@ -137,7 +149,10 @@ func (m Model) View() string {
 	}
 
 	w := m.Engine.World
-	c := m.Engine.Country
+	var c *domain.Country
+	if w != nil && len(w.Countries) > 0 {
+		c = w.Countries[0]
+	}
 
 	// Header
 	headerText := "CODEX MUNDI"

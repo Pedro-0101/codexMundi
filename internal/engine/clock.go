@@ -44,10 +44,8 @@ func (c *Clock) Start() {
 		ticker.Reset(interval)
 
 		<-ticker.C
-		c.mu.Lock()
-		c.currentTime = c.currentTime.AddDate(0, 0, 1) // Advance 1 day per tick
-		newTime := c.currentTime
-		c.mu.Unlock()
+		c.AdvanceDate(1)
+		newTime := c.GetCurrentTime()
 
 		// Non-blocking send to tickChan
 		select {
@@ -56,6 +54,13 @@ func (c *Clock) Start() {
 		}
 
 	}
+}
+
+// AdvanceDate advances the clock by a specific number of days.
+func (c *Clock) AdvanceDate(days int) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.currentTime = c.currentTime.AddDate(0, 0, days)
 }
 
 func (c *Clock) GetTickChan() <-chan time.Time {
