@@ -4,10 +4,9 @@ import "time"
 
 // World represents the global environment and state of the simulation.
 type World struct {
-	Date     time.Time
-	Era      *Era
-	Speed    int
-	IsPaused bool
+	Date  time.Time
+	Era   *Era
+	Speed int
 }
 
 // GetSeason returns the current season based on Northern Hemisphere logic.
@@ -28,10 +27,6 @@ func (w *World) GetSeason() string {
 }
 
 // AdvanceDate moves the world time forward based on the current speed.
-func (w *World) AdvanceDate() {
-	if w.IsPaused {
-		return
-	}
-	// In the MVP, each tick advances 1 day for simplicity.
-	w.Date = w.Date.AddDate(0, 0, 1)
+func (w *World) AdvanceDate(speed int) {
+	w.Date = w.Date.AddDate(0, 0, speed)
 }
